@@ -7,6 +7,7 @@ variable "subnet_cidr_block" {}
 variable "avail_zone" {}
 variable "env_prefix" {}
 variable "my_ip" {}
+variable "instance_type" {}
 
 resource "aws_vpc" "myapp-vpc" {
   cidr_block = var.vpc_cidr_block
@@ -23,18 +24,6 @@ resource "aws_subnet" "myapp-subnet-1" {
     Name : "${var.env_prefix}-subnet-1"
   }
 }
-
-/*resource "aws_route_table" "myapp-route-table" {
-  vpc_id = aws_vpc.myapp-vpc.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.myapp-igw.id
-  }
-  tags = {
-    Name : "${var.env_prefix}-rtb"
-  }
-}*/
 
 resource "aws_internet_gateway" "myapp-igw" {
   vpc_id = aws_vpc.myapp-vpc.id
@@ -55,8 +44,7 @@ resource "aws_default_route_table" "main-rtb" {
   }
 }
 
-resource "aws_security_group" "myapp-sg" {
-  name   = "myapp-sg"
+resource "aws_default_security_group" "default-sg" {
   vpc_id = aws_vpc.myapp-vpc.id
 
   ingress {
@@ -82,8 +70,36 @@ resource "aws_security_group" "myapp-sg" {
   }
 
   tags = {
-    Name : "${var.env_prefix}-sg"
+    Name : "${var.env_prefix}-default-sg"
   }
 }
+
+data "aws_ami" "latest-amazon-linux-image" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-kernel-*"]
+  }
+
+}
+
+output "aws_ami_id" {
+  value       = data.aws_ami.latest-amazon-linux-image.id
+  sensitive   = false
+  description = "description"
+  depends_on  = []
+}
+
+
+resource "aws_instance" "myapp-server" {
+  ami           = data.aws_ami.latest-amazon-linux-image.id
+  instance_type = var.instance_type
+
+  subnet_id             = aws_subnet.myapp-subnet-1.id
+  vpc_security_grou_ids = [aws_default_security_group.default-sg.id]
+}
+
 
 
